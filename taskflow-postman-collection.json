@@ -1,0 +1,370 @@
+{
+  "info": {
+    "name": "TaskFlow API",
+    "description": "Complete API collection for the TaskFlow Task Management System.\n\nBase URL: http://localhost:4000\n\n**Setup:**\n1. Register or login to get tokens\n2. The `accessToken` and `refreshToken` variables are auto-set by the login/register requests\n3. All `/tasks` requests use the `accessToken` variable automatically",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000", "type": "string" },
+    { "key": "accessToken", "value": "", "type": "string" },
+    { "key": "refreshToken", "value": "", "type": "string" },
+    { "key": "taskId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', res.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', res.refreshToken);",
+                  "  pm.test('Registration successful', () => pm.response.to.have.status(201));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Doe\",\n  \"email\": \"jane@example.com\",\n  \"password\": \"secret123\"\n}"
+            },
+            "description": "Create a new user account. Returns access and refresh tokens.\n\n**Validation:**\n- `name` — required\n- `email` — must be valid email, unique\n- `password` — minimum 8 characters\n\n**Response 201:**\n```json\n{\n  \"user\": { \"id\", \"name\", \"email\", \"createdAt\" },\n  \"accessToken\": \"<jwt>\",\n  \"refreshToken\": \"<jwt>\"\n}\n```\n**Response 409:** Email already in use"
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"user\": {\n    \"id\": \"uuid\",\n    \"name\": \"Jane Doe\",\n    \"email\": \"jane@example.com\",\n    \"createdAt\": \"2024-01-01T00:00:00.000Z\"\n  },\n  \"accessToken\": \"eyJ...\",\n  \"refreshToken\": \"eyJ...\"\n}"
+            },
+            {
+              "name": "400 Validation Error",
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"errors\": [\n    { \"msg\": \"Valid email required\", \"path\": \"email\" },\n    { \"msg\": \"Password must be at least 8 characters\", \"path\": \"password\" }\n  ]\n}"
+            },
+            {
+              "name": "409 Email Taken",
+              "status": "Conflict",
+              "code": 409,
+              "body": "{ \"error\": \"Email already in use\" }"
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', res.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', res.refreshToken);",
+                  "  pm.test('Login successful', () => pm.response.to.have.status(200));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"jane@example.com\",\n  \"password\": \"secret123\"\n}"
+            },
+            "description": "Authenticate an existing user.\n\n**Response 200:**\n```json\n{\n  \"user\": { \"id\", \"name\", \"email\", \"createdAt\", \"updatedAt\" },\n  \"accessToken\": \"<jwt — expires in 15m>\",\n  \"refreshToken\": \"<jwt — expires in 7d>\"\n}\n```\n**Response 401:** Invalid credentials"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"user\": {\n    \"id\": \"uuid\",\n    \"name\": \"Jane Doe\",\n    \"email\": \"jane@example.com\",\n    \"createdAt\": \"2024-01-01T00:00:00.000Z\"\n  },\n  \"accessToken\": \"eyJ...\",\n  \"refreshToken\": \"eyJ...\"\n}"
+            },
+            {
+              "name": "401 Invalid Credentials",
+              "status": "Unauthorized",
+              "code": 401,
+              "body": "{ \"error\": \"Invalid credentials\" }"
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', res.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', res.refreshToken);",
+                  "  pm.test('Token refreshed', () => pm.response.to.have.status(200));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/refresh",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "description": "Exchange a valid refresh token for a new access token + refresh token pair (token rotation — old refresh token is invalidated).\n\n**Response 200:**\n```json\n{\n  \"accessToken\": \"<new jwt>\",\n  \"refreshToken\": \"<new jwt>\"\n}\n```\n**Response 401:** Invalid or expired refresh token"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"accessToken\": \"eyJ...\",\n  \"refreshToken\": \"eyJ...\"\n}"
+            },
+            {
+              "name": "401 Invalid Token",
+              "status": "Unauthorized",
+              "code": 401,
+              "body": "{ \"error\": \"Invalid or expired refresh token\" }"
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/logout",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "description": "Invalidates the provided refresh token. The access token will expire naturally after 15 minutes.\n\n**Response 200:**\n```json\n{ \"message\": \"Logged out successfully\" }\n```"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{ \"message\": \"Logged out successfully\" }"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tasks",
+      "item": [
+        {
+          "name": "Get All Tasks",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Tasks fetched', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "if (res.tasks && res.tasks.length > 0) {",
+                  "  pm.collectionVariables.set('taskId', res.tasks[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/tasks?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Page number (default: 1)" },
+                { "key": "limit", "value": "10", "description": "Items per page (default: 10, max: 50)" },
+                { "key": "status", "value": "", "description": "Filter by status: PENDING | IN_PROGRESS | COMPLETED", "disabled": true },
+                { "key": "search", "value": "", "description": "Search by task title (partial match)", "disabled": true }
+              ]
+            },
+            "description": "Returns a paginated list of tasks belonging to the authenticated user.\n\n**Query Parameters:**\n| Param | Type | Default | Description |\n|-------|------|---------|-------------|\n| `page` | number | 1 | Page number |\n| `limit` | number | 10 | Items per page (max 50) |\n| `status` | string | — | Filter: `PENDING`, `IN_PROGRESS`, `COMPLETED` |\n| `search` | string | — | Partial title match |\n\n**Response 200:**\n```json\n{\n  \"tasks\": [ ...Task[] ],\n  \"pagination\": {\n    \"page\": 1, \"limit\": 10, \"total\": 42,\n    \"totalPages\": 5, \"hasNext\": true, \"hasPrev\": false\n  }\n}\n```"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"tasks\": [\n    {\n      \"id\": \"uuid\",\n      \"title\": \"Write unit tests\",\n      \"description\": \"Cover auth and task routes\",\n      \"status\": \"PENDING\",\n      \"priority\": \"HIGH\",\n      \"dueDate\": \"2024-12-31T00:00:00.000Z\",\n      \"createdAt\": \"2024-01-01T00:00:00.000Z\",\n      \"updatedAt\": \"2024-01-01T00:00:00.000Z\",\n      \"userId\": \"uuid\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 1,\n    \"totalPages\": 1,\n    \"hasNext\": false,\n    \"hasPrev\": false\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Task created', () => pm.response.to.have.status(201));",
+                  "const res = pm.response.json();",
+                  "if (res.id) pm.collectionVariables.set('taskId', res.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/tasks",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Write unit tests\",\n  \"description\": \"Cover auth and task routes\",\n  \"priority\": \"HIGH\",\n  \"dueDate\": \"2024-12-31\"\n}"
+            },
+            "description": "Create a new task for the authenticated user.\n\n**Body:**\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `title` | string | ✅ | Task title |\n| `description` | string | ❌ | Optional details |\n| `priority` | string | ❌ | `LOW`, `MEDIUM` (default), `HIGH` |\n| `dueDate` | string | ❌ | ISO 8601 date e.g. `2024-12-31` |\n\n**Response 201:** Created task object"
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"id\": \"uuid\",\n  \"title\": \"Write unit tests\",\n  \"description\": \"Cover auth and task routes\",\n  \"status\": \"PENDING\",\n  \"priority\": \"HIGH\",\n  \"dueDate\": \"2024-12-31T00:00:00.000Z\",\n  \"createdAt\": \"2024-01-01T00:00:00.000Z\",\n  \"updatedAt\": \"2024-01-01T00:00:00.000Z\",\n  \"userId\": \"uuid\"\n}"
+            },
+            {
+              "name": "400 Validation Error",
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{ \"errors\": [{ \"msg\": \"Title is required\", \"path\": \"title\" }] }"
+            }
+          ]
+        },
+        {
+          "name": "Get Task by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/tasks/{{taskId}}",
+            "description": "Fetch a single task by ID. Only returns the task if it belongs to the authenticated user.\n\n**Response 200:** Task object\n**Response 404:** Task not found"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"id\": \"uuid\",\n  \"title\": \"Write unit tests\",\n  \"status\": \"PENDING\",\n  \"priority\": \"HIGH\",\n  \"dueDate\": \"2024-12-31T00:00:00.000Z\",\n  \"createdAt\": \"2024-01-01T00:00:00.000Z\",\n  \"updatedAt\": \"2024-01-01T00:00:00.000Z\",\n  \"userId\": \"uuid\"\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "body": "{ \"error\": \"Task not found\" }"
+            }
+          ]
+        },
+        {
+          "name": "Update Task",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/tasks/{{taskId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Write unit tests (updated)\",\n  \"status\": \"IN_PROGRESS\",\n  \"priority\": \"MEDIUM\",\n  \"dueDate\": \"2024-12-31\"\n}"
+            },
+            "description": "Partially update a task. All fields are optional — only send what you want to change.\n\n**Body (all optional):**\n| Field | Type | Description |\n|-------|------|-------------|\n| `title` | string | New title |\n| `description` | string | New description |\n| `status` | string | `PENDING`, `IN_PROGRESS`, `COMPLETED` |\n| `priority` | string | `LOW`, `MEDIUM`, `HIGH` |\n| `dueDate` | string | ISO 8601 date or `null` to clear |\n\n**Response 200:** Updated task object\n**Response 404:** Task not found"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"id\": \"uuid\",\n  \"title\": \"Write unit tests (updated)\",\n  \"status\": \"IN_PROGRESS\",\n  \"priority\": \"MEDIUM\",\n  \"dueDate\": \"2024-12-31T00:00:00.000Z\",\n  \"updatedAt\": \"2024-01-02T00:00:00.000Z\",\n  \"userId\": \"uuid\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Toggle Task Status",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/tasks/{{taskId}}/toggle",
+            "description": "Cycles the task status forward:\n\n`PENDING` → `IN_PROGRESS` → `COMPLETED` → `PENDING`\n\nNo request body needed.\n\n**Response 200:** Updated task object with new status\n**Response 404:** Task not found"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"id\": \"uuid\",\n  \"title\": \"Write unit tests\",\n  \"status\": \"IN_PROGRESS\",\n  \"updatedAt\": \"2024-01-02T00:00:00.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Delete Task",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/tasks/{{taskId}}",
+            "description": "Permanently delete a task. Only the owner can delete their task.\n\n**Response 200:**\n```json\n{ \"message\": \"Task deleted successfully\" }\n```\n**Response 404:** Task not found"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{ \"message\": \"Task deleted successfully\" }"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "body": "{ \"error\": \"Task not found\" }"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/health",
+            "description": "Check if the API server is running.\n\n**Response 200:**\n```json\n{ \"status\": \"ok\", \"timestamp\": \"2024-01-01T00:00:00.000Z\" }\n```"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{ \"status\": \"ok\", \"timestamp\": \"2024-01-01T00:00:00.000Z\" }"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
